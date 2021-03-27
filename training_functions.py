@@ -1,7 +1,9 @@
 import numpy as np
 import pandas as pd
+import os
+
 from datasets import MicroDataset
-from pytorch_models import LitEncoderDecoder
+from pytorch_models import LitEncoderDecoder, LitDAE
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
@@ -96,6 +98,24 @@ def run_training(train_df,
 SAE_parameters = [
     {
      'name':'layer_size', 
+     'type':'choice', 
+     'values':[32, 64, 128, 256, 512]
+    },
+    {
+    'name':'classifier_model',
+    'type':'choice',
+    'values':['svm', 'rf']
+    }
+    ]
+
+DAE_parameters = [
+    {
+     'name':'layer_1_size', 
+     'type':'choice', 
+     'values':[64, 128, 256, 512, 1024]
+    },
+    {
+     'name':'layer_2_size', 
      'type':'choice', 
      'values':[32, 64, 128, 256, 512]
     },
@@ -234,6 +254,11 @@ def tune_SAE(dataset,
 
         #load model from best-performing epoch
         lightning.load_state_dict(torch.load(checkpoint_callback.best_model_path )['state_dict'])
+        
+        #delete the files once we're done with them -- no need to store things unnecessarily
+        os.system('rm '+ checkpoint_callback.best_model_path)
+        os.system('rm -R checkpoint_dir/test_tube_logger/*')
+        
         #set model to eval()
         lightning=lightning.eval()
 
@@ -277,6 +302,122 @@ def tune_SAE(dataset,
     best_parameters, best_values, experiment, model = optimize(
         parameters = SAE_parameters,
         evaluation_function=SAE_eval, 
+        total_trials = total_trials, 
+        minimize=False)
+    
+    data_name=dataset.index[0] 
+    if is_marker==False:
+        data_type='Abundance'
+    else:
+        data_type='Marker'
+    
+    return([data_type, data_name, best_parameters, best_values])
+
+
+
+def tune_DAE(dataset, 
+             DAE_parameters=DAE_parameters, 
+             is_marker=False, 
+             seed=0, 
+             total_trials=8):
+    #set a seed so that splits are the same across different model tests
+    np.random.seed(seed)
+    #make data splits
+    train_df, test_df = make_split(dataset)
+    train_df, valid_df = make_split(train_df)
+    
+    def DAE_eval(hyperparams):
+        """this function runs a complete train/valid/testing loop
+            for an SAE model, given the specified hyperparameters, 
+            it returns the AUC on the test set
+            
+            Defining it inside the tuning function to avoid having to manually pass the train_df and valid_df,
+                    Ax tuning doesn't allow that
+            """
+        #Initialize the model
+        lightning = LitDAE(train_df, 
+                           valid_df, 
+                           layer_1_dim = hyperparams['layer_1_size'],
+                           layer_2_dim = hyperparams['layer_2_size'],
+                           learning_rate = .001,
+                           batch_size=50, 
+                            is_marker=is_marker
+                          )
+
+        #setr up the trainer/logger/callbacks
+        checkpoint_callback=ModelCheckpoint(
+                        dirpath = 'checkpoint_dir',
+                        save_top_k=1,
+                        verbose=False,
+                        monitor='val_loss',
+                        mode='min'
+                        )
+
+        tube_logger = TestTubeLogger('checkpoint_dir', 
+                                    name='test_tube_logger')
+
+        trainer = pl.Trainer(max_epochs = 500,
+                             logger=tube_logger,
+                             progress_bar_refresh_rate=0,
+                             weights_summary=None,
+                             check_val_every_n_epoch=1,
+                             checkpoint_callback=checkpoint_callback,
+                            callbacks=[EarlyStopping(monitor='val_loss', 
+                                                    patience=20)]) #the patience of 20 is mentioned in the DeepMicro paper
+
+        #run training
+        trainer.fit(lightning)
+
+        #load model from best-performing epoch
+        lightning.load_state_dict(torch.load(checkpoint_callback.best_model_path )['state_dict'])
+        
+        #delete the files once we're done with them -- no need to store things unnecessarily
+        os.system('rm '+ checkpoint_callback.best_model_path)
+        os.system('rm -R checkpoint_dir/test_tube_logger/*')
+        
+        #set model to eval()
+        lightning=lightning.eval()
+
+        #recombine the train/valid datasets for k-fold validation, as descrbed in the paper
+        X = np.vstack([lightning.model.encode(lightning.train_dataset.matrix).detach().numpy(), 
+                       lightning.model.encode(lightning.valid_dataset.matrix).detach().numpy()])
+
+        y = np.hstack([lightning.train_dataset.y.detach().numpy(),
+                       lightning.valid_dataset.y.detach().numpy()] )
+
+        #set up classifier model tuning
+        if hyperparams['classifier_model']=='rf':
+            eval_model=rf_eval
+            eval_params = rf_parameters
+        elif hyperparams['classifier_model']=='svm':
+            eval_model=svm_eval
+            eval_params=svm_parameters
+
+        #tune the best classifier model, using 5-fold CV ==> this also employs AX under the hood
+        best_parameters=eval_model(X,y, eval_params)
+
+        # make a classifier with teh best hyperparams
+        if hyperparams['classifier_model']=='rf':
+            best_classifier=RandomForestClassifier()
+            [setattr(best_classifier, a, q) for a,q in best_parameters.items()]
+
+        elif hyperparams['classifier_model']=='svm':
+            best_classifier=SVC(probability=True)
+            [setattr(best_classifier, a, np.power(2., q)) for a,q in best_parameters.items()]
+
+        # fit it on the full train, valid data
+        best_classifier.fit(X, y)
+
+        # Get AUC for the full setup on the test set
+        test_dataset=MicroDataset(test_df, is_marker=is_marker)
+        test_preds=best_classifier.predict_proba( lightning.model.encode(test_dataset.matrix).detach().numpy() )
+        test_roc = roc_curve( test_dataset.y.detach().numpy(), test_preds[:,1] )
+        return(auc(test_roc[0], test_roc[1]) ) 
+
+    #optimize hyperparapeter with Facebook's ax tuning 
+    best_parameters, best_values, experiment, model = optimize(
+        parameters = DAE_parameters,
+        evaluation_function=DAE_eval, 
         total_trials = total_trials, 
         minimize=False)
     

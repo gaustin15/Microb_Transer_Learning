@@ -57,6 +57,31 @@ class SAE(torch.nn.Module):
         return( self.encoder(x) )
     
     
+class DAE(torch.nn.Module):
+    """
+    The 'Deep' autoencoder (is two layers each way)
+    """
+    def __init__(self, 
+                 dataset, 
+                 layer_1_dim = 64,
+                 layer_2_dim = 64,
+                 dropout = .2):
+        super(DAE, self).__init__()
+        
+        self.encoder = nn.Sequential(*[nn.Linear(dataset.n_taxa, layer_1_dim), nn.ReLU(), 
+                                       nn.Linear(layer_1_dim, layer_2_dim), nn.ReLU()])
+        
+        self.decoder = nn.Sequential(*[nn.Linear(layer_2_dim, layer_1_dim), nn.ReLU(),
+                                       nn.Linear(layer_1_dim, dataset.n_taxa), nn.ReLU(), nn.Softmax()])
+        
+    def forward(self, x):
+        out = self.decoder( self.encoder(x) )
+        return(out)
+    
+    def encode(self, x):
+        return( self.encoder(x) )
+    
+    
     
     
 ### Pytorch Lightning Modules -- Used for the training loop
@@ -83,6 +108,67 @@ class LitEncoderDecoder(pl.LightningModule):
         self.valid_loader = DataLoader(self.valid_dataset, batch_size = batch_size, shuffle = False)
         #test_dataloader = DataLoader(self.test_dataset, batch_size = 50, shuffle = False)
         self.model = SAE(self.train_dataset, layer_dim = layer_dim, dropout = dropout)
+        self.learning_rate = learning_rate
+        
+        # they use MSE for reconstruction loss
+        self.loss_func = nn.MSELoss()
+        
+        
+    def train_dataloader(self):
+        return(self.train_loader)
+    
+    def val_dataloader(self):
+        return(self.valid_loader)
+    
+    def forward(self, x):
+        x = self.model(x)
+        return x
+
+    def split_batch(self, batch):
+        return batch[0], batch[1]
+
+    def training_step(self, batch, batch_idx):
+        x, y = self.split_batch(batch)
+        y_hat = self(x)
+        loss = self.loss_func(y_hat, x)
+        return loss
+
+    def validation_step(self, batch, batch_idx):
+        x, y = self.split_batch(batch)
+        y_hat = self(x)
+        loss = self.loss_func(y_hat, x)
+        self.log('val_loss', loss)
+        return {'val_loss':loss}
+ 
+    def configure_optimizers(self):
+        return torch.optim.Adam(self.parameters(), lr=self.learning_rate)
+    
+    
+    
+class LitDAE(pl.LightningModule):
+    def __init__(self, 
+                 train_df,
+                 valid_df, 
+                 layer_1_dim = 64,
+                 layer_2_dim = 64,
+                 dropout = .2,
+                 learning_rate=1e-3, 
+                 batch_size=50, 
+                 is_marker=False):
+        super().__init__()
+        
+        self.train_dataset = MicroDataset(train_df, is_marker=is_marker)
+        self.valid_dataset = MicroDataset(valid_df, is_marker=is_marker)
+        #self.test_dataset = MicroDataset(test_df)
+        
+        
+        self.train_loader = DataLoader(self.train_dataset, batch_size = batch_size, shuffle = True)
+        self.valid_loader = DataLoader(self.valid_dataset, batch_size = batch_size, shuffle = False)
+        #test_dataloader = DataLoader(self.test_dataset, batch_size = 50, shuffle = False)
+        self.model = DAE(self.train_dataset, 
+                         layer_1_dim = layer_1_dim,
+                         layer_2_dim = layer_2_dim,
+                         dropout = dropout)
         self.learning_rate = learning_rate
         
         # they use MSE for reconstruction loss
