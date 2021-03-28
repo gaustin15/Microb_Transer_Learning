@@ -3,6 +3,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
+import torch.nn.functional as F
 import os
 
 
@@ -26,6 +27,9 @@ class MicroDataset(Dataset):
         else:
             self.taxa_cols = df.columns[df.columns.str.contains('gi[|]')] 
         self.matrix = torch.Tensor( df[self.taxa_cols].astype(float).values ).float()
+        if is_marker:
+            #scale the marker dataset to be in abundance space
+            self.matrix=F.softmax(self.matrix)
         self.y = torch.Tensor(df.disease != 'n' ).long()
         
         self.n_samples, self.n_taxa= self.matrix.shape

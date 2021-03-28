@@ -1,9 +1,11 @@
 import numpy as np
 import pandas as pd
+import math
 import os
 
 from datasets import MicroDataset
-from pytorch_models import LitEncoderDecoder, LitDAE
+from torch.utils.data import DataLoader
+from pytorch_models import LitEncoderDecoder, LitDAE, LitVAE, LitFFNN
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
@@ -94,6 +96,7 @@ def run_training(train_df,
 
     
 ### hyperparameters to tune for each model type
+## following the hyperparameter sets outlined in DeepMicro's Supplementary materials
 
 SAE_parameters = [
     {
@@ -126,6 +129,24 @@ DAE_parameters = [
     }
     ]
 
+VAE_parameters = [
+    {
+     'name':'layer_1_size', 
+     'type':'choice', 
+     'values':[32, 64, 128, 256, 512]
+    },
+    {
+     'name':'layer_2_size', 
+     'type':'choice', 
+     'values':[4, 8, 16]
+    },
+    {
+    'name':'classifier_model',
+    'type':'choice',
+    'values':['svm', 'rf']
+    }
+    ]
+
 rf_parameters = [
       {
      'name':'n_estimators', 
@@ -149,16 +170,42 @@ svm_parameters = [
           {
      'name':'C',
      'type':'choice', 
-     'values': [-5, -3, -1, 1, 3, 5]#[np.power(2., a).astype(float) for a in [-5, -3, -1, 1, 3, 5]]
+     'values': [-5, -3, -1, 1, 3, 5]
     },
          {
      'name':'gamma', 
      'type':'choice', 
-     'values':[-15, -13, -11, -9, -7, -5, -3, -1, 2, 23]#[np.power(2., a).astype(float) for a in [-15, -13, -11, -9, -7, -5, -3, -1, 2, 23]]
+     'values':[-15, -13, -11, -9, -7, -5, -3, -1, 2, 23]
     }
 ]
     
-    
+FFNN_parameters = [
+    {
+     'name':'layer_1_size', 
+     'type':'choice', 
+     'values':[128, 256, 512, 1024]
+    },
+    {
+     'name':'layer_2_size', 
+     'type':'choice', 
+     'values':[256, 128, 64]
+    },
+    {
+     'name':'layer_3_size', 
+     'type':'choice', 
+     'values':[128, 64, 32]
+    },
+    {
+    'name':'learning_rate', 
+    'type':'choice', 
+    'values':[1e-3, 1e-2, 1e-1]
+    },
+    {
+    'name':'dropout', 
+    'type':'choice', 
+    'values':[.1, .3, .5]
+    }
+    ]
     
     
 
@@ -170,7 +217,11 @@ def rf_eval(X, y, rf_hyperparams, n_folds=5, total_trials=10):
         model=RandomForestClassifier()
         [setattr(model, a, q) for a,q in p.items()]
         roc, model = run_training(X, y, n_folds=n_folds, model=model)
-        return(auc(roc[0], roc[1]))
+        auc_val=auc(roc[0],roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
+    
     
     best_parameters, best_values, experiment, model = optimize(
         parameters = rf_hyperparams,
@@ -189,7 +240,11 @@ def svm_eval(X, y, svm_hyperparams, n_folds=5, total_trials=10):
         model=SVC(probability=True)
         [setattr(model, a, np.power(2., q)) for a,q in p.items()]
         roc, model = run_training(X, y, n_folds=n_folds, model=model)
-        return(auc(roc[0], roc[1]))
+        auc_val=auc(roc[0],roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
+    
     
     best_parameters, best_values, experiment, model = optimize(
         parameters = svm_hyperparams,
@@ -200,6 +255,234 @@ def svm_eval(X, y, svm_hyperparams, n_folds=5, total_trials=10):
     return(best_parameters)
     
 
+### BELOW ARE THE MAIN TUNING FUNCTIONS
+# TAKE A DATASET AS AN INPUT, AND RETURNS A SUMMARY OF THE BEST-PERFORMING MODEL
+    
+def tune_RF(dataset, 
+             rf_parameters=rf_parameters, 
+             is_marker=False, 
+             seed=0, 
+             total_trials=15):
+    """
+    function to get baseline for standalone random forest
+    """
+    
+    #set a seed so that splits are the same across different model tests
+    np.random.seed(seed)
+    
+    #make data splits
+    train_df, test_df = make_split(dataset)
+    
+    #for rf, go straight to k-fold
+    train_dataset=MicroDataset(train_df, is_marker=is_marker)
+    X = train_dataset.matrix.detach().numpy()
+    y = train_dataset.y.detach().numpy()
+    
+    def evaluation_func(p):
+        #the function used for the hyperparameter tuning
+        model=RandomForestClassifier()
+        [setattr(model, a, q) for a,q in p.items()]
+        roc, model = run_training(X, y, model=model)
+        auc_val=auc(roc[0],roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
+    
+    
+    best_parameters, best_values, experiment, model = optimize(
+        parameters = rf_parameters,
+        evaluation_function=evaluation_func,
+        total_trials=total_trials, 
+        minimize=False)
+    
+    #make a model with the best parameters
+    best_classifier=RandomForestClassifier()
+    [setattr(best_classifier, a, q) for a,q in best_parameters.items()]
+    
+    # fit it on the full train, valid data
+    best_classifier.fit(X, y)
+
+    # Get AUC for the full setup on the test set
+    test_dataset=MicroDataset(test_df, is_marker=is_marker)
+    test_preds=best_classifier.predict_proba( test_dataset.matrix.detach().numpy() )
+    test_roc = roc_curve( test_dataset.y.detach().numpy(), test_preds[:,1] )
+    best_val=auc(test_roc[0], test_roc[1])
+    
+    
+    data_name=dataset.index[0] 
+    if is_marker==False:
+        data_type='Abundance'
+    else:
+        data_type='Marker'
+    
+    return(['RF', data_type, data_name, best_parameters, best_val])
+
+
+
+def tune_SVM(dataset, 
+             svm_parameters=svm_parameters, 
+             is_marker=False, 
+             seed=0, 
+             total_trials=15):
+    """
+    function to get baseline for standalone SVM
+    """
+    
+    #set a seed so that splits are the same across different model tests
+    np.random.seed(seed)
+    
+    #make data splits
+    train_df, test_df = make_split(dataset)
+    
+    #for rf, go straight to k-fold
+    train_dataset=MicroDataset(train_df, is_marker=is_marker)
+    X = train_dataset.matrix.detach().numpy()
+    y = train_dataset.y.detach().numpy()
+    
+    def evaluation_func(p):
+        #the function used for the hyperparameter tuning
+        model=SVC(probability=True)
+        [setattr(model, a, np.power(2.,q)) for a,q in p.items()]
+        roc, model = run_training(X, y, model=model)
+        auc_val=auc(roc[0],roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
+    
+    best_parameters, best_values, experiment, model = optimize(
+        parameters = svm_parameters,
+        evaluation_function=evaluation_func,
+        total_trials=total_trials, 
+        minimize=False)
+    
+    #make a model with the best parameters
+    best_classifier=SVC(probability=True)
+    [setattr(best_classifier, a, np.power(2.,q)) for a,q in best_parameters.items()]
+    
+    # fit it on the full train, valid data
+    best_classifier.fit(X, y)
+
+    # Get AUC for the full setup on the test set
+    test_dataset=MicroDataset(test_df, is_marker=is_marker)
+    test_preds=best_classifier.predict_proba( test_dataset.matrix.detach().numpy() )
+    test_roc = roc_curve( test_dataset.y.detach().numpy(), test_preds[:,1] )
+    best_val=auc(test_roc[0], test_roc[1])
+    
+    
+    data_name=dataset.index[0] 
+    if is_marker==False:
+        data_type='Abundance'
+    else:
+        data_type='Marker'
+    
+    return(['SVM', data_type, data_name, best_parameters, best_val])
+    
+    
+    
+def tune_FFNN(dataset, 
+             FFNN_parameters=FFNN_parameters, 
+             is_marker=False, 
+             seed=0, 
+             total_trials=8):
+    #set a seed so that splits are the same across different model tests
+    np.random.seed(seed)
+    #make data splits
+    train_df, test_df = make_split(dataset)
+    train_df, valid_df = make_split(train_df)
+    
+    def FFNN_eval(hyperparams):
+        """this function runs a complete train/valid/testing loop
+            for an SAE model, given the specified hyperparameters, 
+            it returns the AUC on the test set
+            
+            Defining it inside the tuning function to avoid having to manually pass the train_df and valid_df,
+                    Ax tuning doesn't allow that
+            """
+        #Initialize the model
+        lightning = LitFFNN(train_df, 
+                            valid_df, 
+                            layer_1_dim = hyperparams['layer_1_size'],
+                            layer_2_dim = hyperparams['layer_2_size'],
+                            layer_3_dim = hyperparams['layer_3_size'],
+                            learning_rate = hyperparams['learning_rate'],
+                            batch_size=50, 
+                            is_marker=is_marker,
+                            dropout=hyperparams['dropout']
+                            )
+
+        #setr up the trainer/logger/callbacks
+        checkpoint_callback=ModelCheckpoint(
+                        dirpath = 'checkpoint_dir',
+                        save_top_k=1,
+                        verbose=False,
+                        monitor='val_loss',
+                        mode='min'
+                        )
+
+        tube_logger = TestTubeLogger('checkpoint_dir', 
+                                    name='test_tube_logger')
+
+        trainer = pl.Trainer(max_epochs = 500,
+                             logger=tube_logger,
+                             progress_bar_refresh_rate=0,
+                             weights_summary=None,
+                             check_val_every_n_epoch=1,
+                             checkpoint_callback=checkpoint_callback,
+                            callbacks=[EarlyStopping(monitor='val_loss', 
+                                                    patience=20)]) #the patience of 20 is mentioned in the DeepMicro paper
+
+        #run training
+        trainer.fit(lightning)
+
+        #load model from best-performing epoch
+        lightning.load_state_dict(torch.load(checkpoint_callback.best_model_path )['state_dict'])
+        
+        #delete the files once we're done with them -- no need to store things unnecessarily
+        #=====> would eat up LOTS of memory if we didn't do this
+        os.system('rm '+ checkpoint_callback.best_model_path)
+        os.system('rm -R checkpoint_dir/test_tube_logger/*')
+        
+        #set model to eval()
+        lightning=lightning.eval()
+
+        # Get AUC for the full setup on the test set
+        test_dataset=MicroDataset(test_df, is_marker=is_marker)
+        test_loader=DataLoader(test_dataset, shuffle=False, batch_size=50)
+        
+        test_preds=[]
+        test_trues=[]
+        
+        for batch in test_loader:
+            test_preds.append(lightning(batch[0]))
+            test_trues.append(batch[1])
+        
+        
+        test_preds=torch.cat(test_preds).detach().numpy()
+        test_roc = roc_curve( torch.cat(test_trues).detach().numpy(), test_preds[:,1] )
+        auc_val=auc(test_roc[0], test_roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
+
+    #optimize hyperparapeter with Facebook's ax tuning 
+    best_parameters, best_values, experiment, model = optimize(
+        parameters = FFNN_parameters,
+        evaluation_function=FFNN_eval, 
+        total_trials = total_trials, 
+        minimize=False)
+    
+    data_name=dataset.index[0] 
+    if is_marker==False:
+        data_type='Abundance'
+    else:
+        data_type='Marker'
+    
+    return(['FFNN', data_type, data_name, best_parameters, best_values])
+
+
+
+    
+    
 def tune_SAE(dataset, 
              SAE_parameters=SAE_parameters, 
              is_marker=False, 
@@ -296,7 +579,10 @@ def tune_SAE(dataset,
         test_dataset=MicroDataset(test_df, is_marker=is_marker)
         test_preds=best_classifier.predict_proba( lightning.model.encode(test_dataset.matrix).detach().numpy() )
         test_roc = roc_curve( test_dataset.y.detach().numpy(), test_preds[:,1] )
-        return(auc(test_roc[0], test_roc[1]) ) 
+        auc_val=auc(test_roc[0], test_roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
 
     #optimize hyperparapeter with Facebook's ax tuning 
     best_parameters, best_values, experiment, model = optimize(
@@ -311,7 +597,7 @@ def tune_SAE(dataset,
     else:
         data_type='Marker'
     
-    return([data_type, data_name, best_parameters, best_values])
+    return(['SAE', data_type, data_name, best_parameters, best_values])
 
 
 
@@ -412,7 +698,10 @@ def tune_DAE(dataset,
         test_dataset=MicroDataset(test_df, is_marker=is_marker)
         test_preds=best_classifier.predict_proba( lightning.model.encode(test_dataset.matrix).detach().numpy() )
         test_roc = roc_curve( test_dataset.y.detach().numpy(), test_preds[:,1] )
-        return(auc(test_roc[0], test_roc[1]) ) 
+        auc_val=auc(test_roc[0], test_roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
 
     #optimize hyperparapeter with Facebook's ax tuning 
     best_parameters, best_values, experiment, model = optimize(
@@ -427,5 +716,124 @@ def tune_DAE(dataset,
     else:
         data_type='Marker'
     
-    return([data_type, data_name, best_parameters, best_values])
+    return(['DAE', data_type, data_name, best_parameters, best_values])
 
+
+
+
+def tune_VAE(dataset, 
+             VAE_parameters=VAE_parameters, 
+             is_marker=False, 
+             seed=0, 
+             total_trials=8):
+    #set a seed so that splits are the same across different model tests
+    np.random.seed(seed)
+    #make data splits
+    train_df, test_df = make_split(dataset)
+    train_df, valid_df = make_split(train_df)
+    
+    def VAE_eval(hyperparams):
+        """this function runs a complete train/valid/testing loop
+            for an VAE model, given the specified hyperparameters, 
+            it returns the AUC on the test set
+            
+            Defining it inside the tuning function to avoid having to manually pass the train_df and valid_df,
+                    Ax tuning doesn't allow that
+            """
+        #Initialize the model
+        lightning = LitVAE(train_df, 
+                           valid_df, 
+                           layer_1_dim = hyperparams['layer_1_size'],
+                           layer_2_dim = hyperparams['layer_2_size'],
+                           learning_rate = .001,
+                           batch_size=50, 
+                            is_marker=is_marker
+                          )
+
+        #setr up the trainer/logger/callbacks
+        checkpoint_callback=ModelCheckpoint(
+                        dirpath = 'checkpoint_dir',
+                        save_top_k=1,
+                        verbose=False,
+                        monitor='val_loss',
+                        mode='min'
+                        )
+
+        tube_logger = TestTubeLogger('checkpoint_dir', 
+                                    name='test_tube_logger')
+
+        trainer = pl.Trainer(max_epochs = 500,
+                             logger=tube_logger,
+                             progress_bar_refresh_rate=0,
+                             weights_summary=None,
+                             check_val_every_n_epoch=1,
+                             checkpoint_callback=checkpoint_callback,
+                            callbacks=[EarlyStopping(monitor='val_loss', 
+                                                    patience=20)]) #the patience of 20 is mentioned in the DeepMicro paper
+
+        #run training
+        trainer.fit(lightning)
+
+        #load model from best-performing epoch
+        lightning.load_state_dict(torch.load(checkpoint_callback.best_model_path )['state_dict'])
+        
+        #delete the files once we're done with them -- no need to store things unnecessarily
+        os.system('rm '+ checkpoint_callback.best_model_path)
+        os.system('rm -R checkpoint_dir/test_tube_logger/*')
+        
+        #set model to eval()
+        lightning=lightning.eval()
+
+        #recombine the train/valid datasets for k-fold validation, as descrbed in the paper
+        X = np.vstack([lightning.model.encode(lightning.train_dataset.matrix).detach().numpy(), 
+                       lightning.model.encode(lightning.valid_dataset.matrix).detach().numpy()])
+
+        y = np.hstack([lightning.train_dataset.y.detach().numpy(),
+                       lightning.valid_dataset.y.detach().numpy()] )
+
+        #set up classifier model tuning
+        if hyperparams['classifier_model']=='rf':
+            eval_model=rf_eval
+            eval_params = rf_parameters
+        elif hyperparams['classifier_model']=='svm':
+            eval_model=svm_eval
+            eval_params=svm_parameters
+
+        #tune the best classifier model, using 5-fold CV ==> this also employs AX under the hood
+        best_parameters=eval_model(X,y, eval_params)
+
+        # make a classifier with teh best hyperparams
+        if hyperparams['classifier_model']=='rf':
+            best_classifier=RandomForestClassifier()
+            [setattr(best_classifier, a, q) for a,q in best_parameters.items()]
+
+        elif hyperparams['classifier_model']=='svm':
+            best_classifier=SVC(probability=True)
+            [setattr(best_classifier, a, np.power(2., q)) for a,q in best_parameters.items()]
+
+        # fit it on the full train, valid data
+        best_classifier.fit(X, y)
+
+        # Get AUC for the full setup on the test set
+        test_dataset=MicroDataset(test_df, is_marker=is_marker)
+        test_preds=best_classifier.predict_proba( lightning.model.encode(test_dataset.matrix).detach().numpy() )
+        test_roc = roc_curve( test_dataset.y.detach().numpy(), test_preds[:,1] )
+        auc_val=auc(test_roc[0], test_roc[1])
+        if math.isnan(auc_val):
+            auc_val=0
+        return(auc_val) 
+
+    #optimize hyperparapeter with Facebook's ax tuning 
+    best_parameters, best_values, experiment, model = optimize(
+        parameters = VAE_parameters,
+        evaluation_function=VAE_eval, 
+        total_trials = total_trials, 
+        minimize=False)
+    
+    data_name=dataset.index[0] 
+    if is_marker==False:
+        data_type='Abundance'
+    else:
+        data_type='Marker'
+    
+    return(['VAE', data_type, data_name, best_parameters, best_values])
