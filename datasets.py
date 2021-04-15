@@ -32,9 +32,9 @@ class MicroDataset(Dataset):
         self.matrix=F.softmax(self.matrix)
             
         if sum(df.disease == 'n')==0:
-            self.y = torch.Tensor(df.disease != 'leaness' ).long()
+            self.y = torch.Tensor( (df.disease != 'leaness').values ).long()
         else:
-            self.y = torch.Tensor(df.disease != 'n' ).long()
+            self.y = torch.Tensor( (df.disease != 'n').values ).long()
         
         self.n_samples, self.n_taxa= self.matrix.shape
         

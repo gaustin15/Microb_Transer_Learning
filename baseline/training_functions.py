@@ -5,7 +5,7 @@ import os
 
 from datasets import MicroDataset
 from torch.utils.data import DataLoader
-from pytorch_models import LitEncoderDecoder, LitDAE, LitVAE, LitFFNN
+from .pytorch_models import LitEncoderDecoder, LitDAE, LitVAE, LitFFNN
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
@@ -17,6 +17,10 @@ import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
 from pytorch_lightning.loggers import TestTubeLogger
+
+from .hyperparams import *
+# note - might want to adjust the ax eval structure
+# ===> could instead make a build_eval_function function that creates an eval applicable to our setup
 
 from ax import optimize
 
@@ -93,121 +97,7 @@ def run_training(train_df,
         y_hat = np.vstack(all_preds)[:, 1]
 
         return(roc_curve(y, y_hat), rf)
-
-    
-### hyperparameters to tune for each model type
-## following the hyperparameter sets outlined in DeepMicro's Supplementary materials
-
-SAE_parameters = [
-    {
-     'name':'layer_size', 
-     'type':'choice', 
-     'values':[32, 64, 128, 256, 512]
-    },
-    {
-    'name':'classifier_model',
-    'type':'choice',
-    'values':['svm', 'rf']
-    }
-    ]
-
-DAE_parameters = [
-    {
-     'name':'layer_1_size', 
-     'type':'choice', 
-     'values':[64, 128, 256, 512, 1024]
-    },
-    {
-     'name':'layer_2_size', 
-     'type':'choice', 
-     'values':[32, 64, 128, 256, 512]
-    },
-    {
-    'name':'classifier_model',
-    'type':'choice',
-    'values':['svm', 'rf']
-    }
-    ]
-
-VAE_parameters = [
-    {
-     'name':'layer_1_size', 
-     'type':'choice', 
-     'values':[32, 64, 128, 256, 512]
-    },
-    {
-     'name':'layer_2_size', 
-     'type':'choice', 
-     'values':[4, 8, 16]
-    },
-    {
-    'name':'classifier_model',
-    'type':'choice',
-    'values':['svm', 'rf']
-    }
-    ]
-
-rf_parameters = [
-      {
-     'name':'n_estimators', 
-     'type':'choice', 
-     'values':[100, 300, 500, 700, 900]
-    },
-         {
-     'name':'min_samples_leaf', 
-     'type':'choice', 
-     'values':[1, 2, 3, 4, 5]
-    },
-         {
-     'name':'criterion', 
-     'type':'choice', 
-     'values':['gini', 'entropy']
-    }
-]
-
-# ax doesn't like the numpy items as parameters
-svm_parameters = [
-          {
-     'name':'C',
-     'type':'choice', 
-     'values': [-5, -3, -1, 1, 3, 5]
-    },
-         {
-     'name':'gamma', 
-     'type':'choice', 
-     'values':[-15, -13, -11, -9, -7, -5, -3, -1, 2, 23]
-    }
-]
-    
-FFNN_parameters = [
-    {
-     'name':'layer_1_size', 
-     'type':'choice', 
-     'values':[128, 256, 512, 1024]
-    },
-    {
-     'name':'layer_2_size', 
-     'type':'choice', 
-     'values':[256, 128, 64]
-    },
-    {
-     'name':'layer_3_size', 
-     'type':'choice', 
-     'values':[128, 64, 32]
-    },
-    {
-    'name':'learning_rate', 
-    'type':'choice', 
-    'values':[1e-3, 1e-2, 1e-1]
-    },
-    {
-    'name':'dropout', 
-    'type':'choice', 
-    'values':[.1, .3, .5]
-    }
-    ]
-    
-    
+   
 
 def rf_eval(X, y, rf_hyperparams, n_folds=5, total_trials=10):
     # find the best hyperamas vis k-fold cross-validation
@@ -280,8 +170,8 @@ def tune_RF(dataset,
     
     def evaluation_func(p):
         #the function used for the hyperparameter tuning
-        model=RandomForestClassifier()
-        [setattr(model, a, q) for a,q in p.items()]
+        model=RandomForestClassifier(**p)
+        #[setattr(model, a, q) for a,q in p.items()]
         roc, model = run_training(X, y, model=model)
         auc_val=auc(roc[0],roc[1])
         if math.isnan(auc_val):
@@ -392,7 +282,7 @@ def tune_FFNN(dataset,
     
     def FFNN_eval(hyperparams):
         """this function runs a complete train/valid/testing loop
-            for an SAE model, given the specified hyperparameters, 
+            for an FFNN model, given the specified hyperparameters, 
             it returns the AUC on the test set
             
             Defining it inside the tuning function to avoid having to manually pass the train_df and valid_df,
@@ -565,8 +455,8 @@ def tune_SAE(dataset,
 
         # make a classifier with teh best hyperparams
         if hyperparams['classifier_model']=='rf':
-            best_classifier=RandomForestClassifier()
-            [setattr(best_classifier, a, q) for a,q in best_parameters.items()]
+            best_classifier=RandomForestClassifier(**best_parameters)
+            #[setattr(best_classifier, a, q) for a,q in best_parameters.items()]
 
         elif hyperparams['classifier_model']=='svm':
             best_classifier=SVC(probability=True)
