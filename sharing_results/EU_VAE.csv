@@ -1,0 +1,5 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+VAE,Abundance,1073,"[128, 8, 'svm']",0.725868725868726
+VAE,Abundance,42,"[256, 8, 'svm']",0.6296296296296297
+VAE,Abundance,361,"[512, 16, 'svm']",0.8705882352941177
+VAE,Abundance,826,"[128, 4, 'svm']",0.7424242424242424

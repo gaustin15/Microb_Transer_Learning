@@ -1,0 +1,7 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+FFNN,Abundance,Quin_gut_liver_cirrhosis,"[1024, 128, 128, 0.1, 0.5]",0.7463768115942029
+FFNN,Abundance,WT2D,"[128, 64, 32, 0.001, 0.5]",0.595959595959596
+FFNN,Abundance,Zeller_fecal_colorectal_cancer,"[256, 256, 32, 0.1, 0.1]",0.7
+FFNN,Abundance,Chatelier_gut_obesity,"[1024, 128, 32, 0.01, 0.1]",0.6903114186851211
+FFNN,Abundance,metahit,"[1024, 64, 128, 0.1, 0.5]",0.6235294117647059
+FFNN,Abundance,t2dmeta_long,"[256, 256, 128, 0.1, 0.1]",0.6058823529411764
