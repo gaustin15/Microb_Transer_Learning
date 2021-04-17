@@ -162,6 +162,7 @@ def tune_shared_encoder(datasets,
                         total_trials=15):
     
     if model_name=='SAE':
+        # we only have 10 possible hyperparam combos for SAE -- this is just gridsearch
         total_trials = 10
     
     #set a seed so that splits are the same across different model tests
