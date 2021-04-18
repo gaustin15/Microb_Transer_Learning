@@ -14,6 +14,9 @@ from baseline.pytorch_models import LitFFNN
 #from baseline.training_functions import *
 from baseline.training_functions import make_split
 
+from sklearn.metrics import roc_curve
+from sklearn.metrics import auc
+
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks.early_stopping import EarlyStopping
 from pytorch_lightning.callbacks import ModelCheckpoint
@@ -21,9 +24,15 @@ from pytorch_lightning.loggers import TestTubeLogger
 
 from datasets import load_abundance_data, get_shared_taxa_dfs
 from datasets import MicroDataset, Dataset
+from torch.utils.data import DataLoader
 import torch.nn.functional as F
 from ax import optimize
-    
+
+import math
+import os
+import warnings
+warnings.filterwarnings('ignore')
+
 MAML_FFNN_parameters = [
     {
      'name':'layer_1_size', 
@@ -58,8 +67,12 @@ MAML_FFNN_parameters = [
     {
     'name':'k',  #k, as in 'k'-shot learning (minimize loss after this many steps during metatraining
      "type": "choice",
-     "values": [1,2,5,10],
+     "values": [1,2,4,8,16],
     },
+#     {'name':'adapt_steps',  #k, as in 'k'-shot learning (minimize loss after this many steps during metatraining
+#      "type": "choice",
+#      "values": [1,2,5,10],
+#     }
     ]
 
 
@@ -74,9 +87,7 @@ def collate(a):
             return(torch.cat( [b[0].unsqueeze(0) for b in a] ),
                    ( q == q.max() ).long() )    
     
-
-    
-def build_taskset(datasets, k=5):
+def build_taskset(datasets, k=4):
     """
     Function to build a learn2learn TaskDataset
     datasest : list -- a list of the different datasets to create training tasks from
@@ -85,22 +96,28 @@ def build_taskset(datasets, k=5):
     dataset = l2l.data.MetaDataset(MetaDS)
     transforms = [
         l2l.data.transforms.NWays(dataset, n=2),
-        l2l.data.transforms.KShots(dataset, k=k),
+        l2l.data.transforms.KShots(dataset, k=k, replacement=True),
         l2l.data.transforms.LoadData(dataset)
     ]
-    return( TaskDataset(dataset, transforms, num_tasks=10, task_collate=collate) )
+    return( TaskDataset(dataset, 
+                        transforms, 
+                        num_tasks=( len(datasets) * 2 * (len(datasets) * 2 - 1) ), 
+                        task_collate=collate) )
     
     
     
 
 
-def build_sharing_encoder_eval_func(train_df,
-                                    valid_df,
-                                    test_df,
-                                    all_trains, 
-                                    all_valids,
-                                    is_marker=False
-                                    ):
+def build_MAML_FFNN_eval_func(train_df,
+                              valid_df,
+                              test_df,
+                              all_trains, 
+                              all_valids,
+                              is_marker=False
+                              ):
+    """
+    wrapper function for ax optimization
+    """
     def eval_func(hyperparams):
         """this function runs a complete train/valid/testing loop
         for an encoder model, given the specified hyperparameters, 
@@ -125,11 +142,24 @@ def build_sharing_encoder_eval_func(train_df,
         #build LightningMAML object
         maml = LightningMAML(lightning.model, 
                              lr = hyperparams['learning_rate'],
-                             adaptation_lr=hyperparams['adaptation_lr']) #0.1)
+                             adaptation_lr=hyperparams['adaptation_lr'], 
+                             train_ways=2, 
+                             test_ways=2,
+                             train_shots = hyperparams['k'],
+                             test_shots =hyperparams['k'],
+                             train_queries = hyperparams['k'],
+                             test_queries =hyperparams['k'],
+                             adaptation_steps=hyperparams['k']) #doesn't necessarily need to be 'k' across the board
+                                                                # this does simplify parameter search though
+
         
         # build metalearning dataloaders
-        train_set = build_taskset(all_trains, k=hyperparams['k'])
-        val_set = build_taskset(all_valids, k=hyperparams['k'])
+        train_set = build_taskset(all_trains, k=hyperparams['k']*2)
+        val_set = build_taskset(all_valids, k=hyperparams['k']*2)
+        
+        for task in train_set:
+            X, y = task
+        
         episodic_data = EpisodicBatcher(train_set, val_set)
         
         #set up the trainer/logger/callbacks
@@ -143,12 +173,13 @@ def build_sharing_encoder_eval_func(train_df,
 
         #build trainer for MAML
         trainer = pl.Trainer(max_epochs = 1000,
-                     progress_bar_refresh_rate=1,
-                     weights_summary='full',
-                     check_val_every_n_epoch=1,
-                     checkpoint_callback=checkpoint_callback,
-                    callbacks=[EarlyStopping(monitor='valid_loss', 
-                                            patience=50)]) 
+                             min_epochs = 50,
+                             progress_bar_refresh_rate=0,
+                             weights_summary=None,
+                             check_val_every_n_epoch=40,
+                             checkpoint_callback=checkpoint_callback,
+                             callbacks=[EarlyStopping(monitor='valid_loss', 
+                                            patience=20)]) 
         
         #run the metalearning
         trainer.fit(maml, episodic_data)
@@ -161,7 +192,7 @@ def build_sharing_encoder_eval_func(train_df,
         
         #remove the log/model files ==> otherwise memory usage would really stack up
         os.system('rm '+ checkpoint_callback.best_model_path)
-        os.system('rm -R checkpoint_dir/test_tube_logger/*')
+        os.system('rm -R lightning_logs/*')
 
         
         #setr up the trainer/logger/callbacks
@@ -177,7 +208,7 @@ def build_sharing_encoder_eval_func(train_df,
                                     name='test_tube_logger')
 
         trainer = pl.Trainer(max_epochs = 500,
-                             min_epochs = 0,
+                             min_epochs = 1,
                              logger=tube_logger,
                              progress_bar_refresh_rate=0,
                              weights_summary=None,
@@ -235,6 +266,7 @@ def tune_MAML_FFNN(datasets,
     #make data splits
     splits = [make_split(df) for df in datasets]
     
+    #do a train/val/test split for the first dataset
     train, test = make_split(datasets[0])
     train, valid = make_split(train)
     
@@ -244,13 +276,13 @@ def tune_MAML_FFNN(datasets,
     vals =  [s[1] for s in splits]
     
     #build evaluation function
-    eval_func = build_sharing_encoder_eval_func(train, 
-                                                valid, 
-                                                test,
-                                                all_trains=trains, 
-                                                all_valids=vals, 
-                                                is_marker=is_marker
-                                                )
+    eval_func = build_MAML_FFNN_eval_func(train, 
+                                          valid, 
+                                          test,
+                                          all_trains=trains, 
+                                          all_valids=vals, 
+                                          is_marker=is_marker
+                                          )
     
     #selectthe parameters based on the model_name
     parameters=MAML_FFNN_parameters
@@ -268,7 +300,18 @@ def tune_MAML_FFNN(datasets,
         data_type='Abundance'
     else:
         data_type='Marker'
-    
+    model_name = 'MAML_FFNN'
     return([model_name, data_type, data_name, best_parameters, best_values])
 
 
+
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
