@@ -301,8 +301,18 @@ def tune_FFNN(dataset,
                             )
 
         #setr up the trainer/logger/callbacks
-        checkpoint_callback=ModelCheckpoint(
-                        dirpath = 'checkpoint_dir',
+            #issue re lightning versions
+        try:
+            checkpoint_callback=ModelCheckpoint(
+                            dirpath = 'checkpoint_dir',
+                            save_top_k=1,
+                            verbose=False,
+                            monitor='val_loss',
+                            mode='min'
+                            )
+        except:
+            checkpoint_callback=ModelCheckpoint(
+                        filepath = 'checkpoint_dir',
                         save_top_k=1,
                         verbose=False,
                         monitor='val_loss',
@@ -402,8 +412,18 @@ def tune_SAE(dataset,
                                       )
 
         #setr up the trainer/logger/callbacks
-        checkpoint_callback=ModelCheckpoint(
-                        dirpath = 'checkpoint_dir',
+            #issue re lightning versions
+        try:
+            checkpoint_callback=ModelCheckpoint(
+                            dirpath = 'checkpoint_dir',
+                            save_top_k=1,
+                            verbose=False,
+                            monitor='val_loss',
+                            mode='min'
+                            )
+        except:
+            checkpoint_callback=ModelCheckpoint(
+                        filepath = 'checkpoint_dir',
                         save_top_k=1,
                         verbose=False,
                         monitor='val_loss',
@@ -521,8 +541,18 @@ def tune_DAE(dataset,
                           )
 
         #setr up the trainer/logger/callbacks
-        checkpoint_callback=ModelCheckpoint(
-                        dirpath = 'checkpoint_dir',
+            #issue re lightning versions
+        try:
+            checkpoint_callback=ModelCheckpoint(
+                            dirpath = 'checkpoint_dir',
+                            save_top_k=1,
+                            verbose=False,
+                            monitor='val_loss',
+                            mode='min'
+                            )
+        except:
+            checkpoint_callback=ModelCheckpoint(
+                        filepath = 'checkpoint_dir',
                         save_top_k=1,
                         verbose=False,
                         monitor='val_loss',
@@ -641,8 +671,18 @@ def tune_VAE(dataset,
                           )
 
         #setr up the trainer/logger/callbacks
-        checkpoint_callback=ModelCheckpoint(
-                        dirpath = 'checkpoint_dir',
+             #issue re lightning versions
+        try:
+            checkpoint_callback=ModelCheckpoint(
+                            dirpath = 'checkpoint_dir',
+                            save_top_k=1,
+                            verbose=False,
+                            monitor='val_loss',
+                            mode='min'
+                            )
+        except:
+            checkpoint_callback=ModelCheckpoint(
+                        filepath = 'checkpoint_dir',
                         save_top_k=1,
                         verbose=False,
                         monitor='val_loss',
