@@ -1,4 +1,4 @@
-# Transfer Learning for Gut Microbiome Analyss
+# Transfer Learning for Gut Microbiome Analysis
 
 This repo contains my project for the Machine Learning for Functional Genomics class. The goal is to explore how transfer learning techniques such as hard parameter sharing and metalearning can improve our ability to detect signals in gut microbiome datasets. This is done by extending the results of DeepMicro (https://www.nature.com/articles/s41598-020-63159-5), a study applying deep learning methods to 6 different collections of fecal gut samples, demontrating that signals can be improved by using autoencoders to reduce the datasets' dimension. We apply transfer learning on feedforward neural networks, in addition to their autoencoder structures, to determine if transfer learning techniques can lead to measurable improvements in predictive performance. 
 
