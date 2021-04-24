@@ -1,7 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-RF,Marker,Zeller_fecal_colorectal_cancer,"[900, 2, 'entropy']",0.5481481481481482
-RF,Marker,Quin_gut_liver_cirrhosis,"[900, 4, 'entropy']",0.943840579710145
-RF,Marker,metahit,"[100, 4, 'gini']",0.7999999999999999
-RF,Marker,t2dmeta_long,"[500, 1, 'entropy']",0.7235294117647059
-RF,Marker,WT2D,"[300, 2, 'entropy']",0.8282828282828283
-RF,Marker,Chatelier_gut_obesity,"[500, 5, 'gini']",0.5432525951557092

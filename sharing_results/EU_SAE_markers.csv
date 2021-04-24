@@ -1,5 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-SAE,Marker,Obesity,"[128, 'rf']",0.6833976833976835
-SAE,Marker,Colorectal,"[512, 'rf']",0.8185185185185185
-SAE,Marker,IBD,"[512, 'rf']",0.9647058823529412
-SAE,Marker,EW-T2D,"[64, 'svm']",0.7878787878787878

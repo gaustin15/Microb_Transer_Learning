@@ -31,7 +31,8 @@ def build_sharing_encoder_eval_func(train,
                                     all_trains, 
                                     all_valids,
                                     model_name = 'DAE', 
-                                    is_marker=False
+                                    is_marker=False,
+                                    return_model=False
                                     ):
     def eval_func(hyperparams):
         """this function runs a complete train/valid/testing loop
@@ -73,8 +74,19 @@ def build_sharing_encoder_eval_func(train,
 
 
         #setr up the trainer/logger/callbacks
-        checkpoint_callback=ModelCheckpoint(
-                        dirpath = 'checkpoint_dir',
+        
+        #issue re lightning versions
+        try: 
+            checkpoint_callback=ModelCheckpoint(
+                            dirpath = 'checkpoint_dir',
+                            save_top_k=1,
+                            verbose=False,
+                            monitor='val_loss',
+                            mode='min'
+                            )
+        except:
+            checkpoint_callback=ModelCheckpoint(
+                        filepath = 'checkpoint_dir',
                         save_top_k=1,
                         verbose=False,
                         monitor='val_loss',
@@ -147,6 +159,10 @@ def build_sharing_encoder_eval_func(train,
         auc_val=auc(test_roc[0], test_roc[1])
         if math.isnan(auc_val):
             auc_val=0
+            
+        if return_model:
+            return(auc_val, (lightning, best_classifier))
+                   
         return(auc_val) 
     
     return(eval_func)

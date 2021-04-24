@@ -1,3 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-SAE,Marker,Colorectal,"[256, 'rf']",0.7407407407407408
-SAE,Marker,IBD,"[128, 'rf']",0.9529411764705882

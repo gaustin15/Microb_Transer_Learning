@@ -113,7 +113,8 @@ def build_MAML_FFNN_eval_func(train_df,
                               test_df,
                               all_trains, 
                               all_valids,
-                              is_marker=False
+                              is_marker=False,
+                              return_model=False
                               ):
     """
     wrapper function for ax optimization
@@ -247,6 +248,10 @@ def build_MAML_FFNN_eval_func(train_df,
         auc_val=auc(test_roc[0], test_roc[1])
         if math.isnan(auc_val):
             auc_val=0
+            
+        if return_model:
+            return(auc_val, lightning)
+            
         return(auc_val) 
     
     return(eval_func)

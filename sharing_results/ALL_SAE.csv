@@ -1,7 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-SAE,Abundance,Obesity,"[64, 'svm']",0.5875
-SAE,Abundance,Colorectal,"[64, 'svm']",0.6222222222222222
-SAE,Abundance,IBD,"[512, 'svm']",0.9058823529411764
-SAE,Abundance,EW-T2D,"[128, 'svm']",0.8080808080808081
-SAE,Abundance,C-T2D,"[64, 'svm']",0.6764705882352942
-SAE,Abundance,Cirrhosis,"[512, 'svm']",0.769927536231884

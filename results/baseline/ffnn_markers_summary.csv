@@ -1,4 +1,6 @@
 Model Type,Data Type,Dataset,hyperparams,AUC
-FFNN,Marker,Zeller_fecal_colorectal_cancer,"[128, 128, 128, 0.1, 0.1]",0.8962962962962964
-FFNN,Marker,Quin_gut_liver_cirrhosis,"[256, 256, 32, 0.001, 0.3]",0.9583333333333334
-FFNN,Marker,metahit,"[1024, 128, 32, 0.1, 0.5]",0.9647058823529412
+FFNN,Marker,Zeller_fecal_colorectal_cancer,"[128, 128, 32, 0.01, 0.3]",0.9037037037037036
+FFNN,Marker,Quin_gut_liver_cirrhosis,"[512, 256, 128, 0.1, 0.5]",0.963768115942029
+FFNN,Marker,metahit,"[512, 128, 128, 0.01, 0.3]",0.9411764705882352
+FFNN,Marker,t2dmeta_long,"[512, 128, 32, 0.001, 0.3]",0.7663865546218488
+FFNN,Marker,WT2D,"[1024, 64, 64, 0.1, 0.1]",0.9494949494949495

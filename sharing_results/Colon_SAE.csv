@@ -1,3 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-SAE,Abundance,Colorectal,"[256, 'svm']",0.6222222222222222
-SAE,Abundance,IBD,"[256, 'rf']",0.8588235294117648

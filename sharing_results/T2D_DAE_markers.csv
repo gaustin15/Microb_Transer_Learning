@@ -1,3 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-DAE,Marker,EW-T2D,"[512, 128, 'rf']",0.8686868686868687
-DAE,Marker,C-T2D,"[1024, 128, 'rf']",0.6499999999999999

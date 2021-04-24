@@ -1,7 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-RF,Abundance,Quin_gut_liver_cirrhosis,"[700, 2, 'gini']",0.9420289855072465
-RF,Abundance,WT2D,"[300, 3, 'gini']",0.8383838383838385
-RF,Abundance,Zeller_fecal_colorectal_cancer,"[300, 3, 'gini']",0.674074074074074
-RF,Abundance,Chatelier_gut_obesity,"[100, 1, 'gini']",0.7569204152249135
-RF,Abundance,metahit,"[900, 3, 'gini']",0.8352941176470587
-RF,Abundance,t2dmeta_long,"[500, 2, 'entropy']",0.7529411764705882

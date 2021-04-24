@@ -1,3 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-SAE,Marker,C-T2D,"[512, 'rf']",0.7756302521008404
-SAE,Marker,Cirrhosis,"[256, 'rf']",0.894927536231884

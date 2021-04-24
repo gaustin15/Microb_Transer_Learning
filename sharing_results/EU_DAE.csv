@@ -1,5 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-DAE,Abundance,1073,"[256, 32, 'rf']",0.8108108108108109
-DAE,Abundance,42,"[64, 256, 'svm']",0.7481481481481482
-DAE,Abundance,361,"[512, 64, 'svm']",0.8764705882352941
-DAE,Abundance,826,"[256, 256, 'svm']",0.8131313131313131

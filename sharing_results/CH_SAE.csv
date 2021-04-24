@@ -1,3 +1,0 @@
-Model Type,Data Type,Dataset,hyperparams,AUC
-SAE,Abundance,C-T2D,"[256, 'svm']",0.6630252100840336
-SAE,Abundance,Cirrhosis,"[256, 'svm']",0.677536231884058
