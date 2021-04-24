@@ -1,0 +1,3 @@
+[submodule "learn2learn"]
+	path = learn2learn
+	url = ./learn2learn/

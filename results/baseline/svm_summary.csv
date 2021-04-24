@@ -1,0 +1,7 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+SVM,Abundance,Quin_gut_liver_cirrhosis,"[3, -5]",0.6992753623188406
+SVM,Abundance,WT2D,"[-1, -9]",0.5454545454545454
+SVM,Abundance,Zeller_fecal_colorectal_cancer,"[1, -15]",0.2296296296296296
+SVM,Abundance,Chatelier_gut_obesity,"[5, 23]",0.5337370242214533
+SVM,Abundance,metahit,"[5, -15]",0.6352941176470588
+SVM,Abundance,t2dmeta_long,"[1, -3]",0.5592436974789916

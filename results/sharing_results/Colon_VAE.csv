@@ -1,0 +1,3 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+VAE,Abundance,Colorectal,"[512, 8, 'rf']",0.6185185185185185
+VAE,Abundance,IBD,"[256, 16, 'rf']",0.8470588235294118

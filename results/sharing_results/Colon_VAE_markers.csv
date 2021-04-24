@@ -1,0 +1,3 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+VAE,Marker,Colorectal,"[512, 8, 'rf']",0.7629629629629628
+VAE,Marker,IBD,"[32, 8, 'rf']",0.8

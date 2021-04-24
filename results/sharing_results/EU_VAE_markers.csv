@@ -1,0 +1,5 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+VAE,Marker,Obesity,"[64, 16, 'svm']",0.6351351351351352
+VAE,Marker,Colorectal,"[128, 16, 'rf']",0.7555555555555558
+VAE,Marker,IBD,"[128, 4, 'rf']",0.8235294117647058
+VAE,Marker,EW-T2D,"[64, 16, 'rf']",0.7474747474747475

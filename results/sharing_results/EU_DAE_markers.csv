@@ -1,0 +1,5 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+DAE,Marker,Obesity,"[128, 64, 'rf']",0.6505791505791506
+DAE,Marker,Colorectal,"[256, 512, 'rf']",0.7333333333333334
+DAE,Marker,IBD,"[1024, 128, 'rf']",0.8823529411764706
+DAE,Marker,EW-T2D,"[128, 128, 'rf']",0.7373737373737373

@@ -1,0 +1,7 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+VAE,Marker,Zeller_fecal_colorectal_cancer,"[64, 16, 'svm']",0.7555555555555556
+VAE,Marker,Quin_gut_liver_cirrhosis,"[32, 8, 'rf']",0.8586956521739131
+VAE,Marker,metahit,"[64, 8, 'rf']",0.9058823529411764
+VAE,Marker,t2dmeta_long,"[32, 4, 'rf']",0.6016806722689075
+VAE,Marker,WT2D,"[256, 8, 'svm']",0.8080808080808081
+VAE,Marker,Chatelier_gut_obesity,"[64, 16, 'rf']",0.7768166089965398

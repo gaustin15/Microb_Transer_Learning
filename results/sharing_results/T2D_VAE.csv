@@ -1,0 +1,3 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+VAE,Abundance,EW-T2D,"[128, 16, 'svm']",0.494949494949495
+VAE,Abundance,C-T2D,"[64, 8, 'svm']",0.6563025210084035

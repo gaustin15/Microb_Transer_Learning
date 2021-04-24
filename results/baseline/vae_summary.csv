@@ -1,0 +1,7 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+VAE,Abundance,Quin_gut_liver_cirrhosis,"[128, 4, 'svm']",0.7210144927536231
+VAE,Abundance,WT2D,"[64, 8, 'rf']",0.5606060606060606
+VAE,Abundance,Zeller_fecal_colorectal_cancer,"[64, 16, 'svm']",0.874074074074074
+VAE,Abundance,Chatelier_gut_obesity,"[512, 16, 'svm']",0.596885813148789
+VAE,Abundance,metahit,"[64, 8, 'rf']",0.6470588235294117
+VAE,Abundance,t2dmeta_long,"[128, 8, 'rf']",0.5970588235294119

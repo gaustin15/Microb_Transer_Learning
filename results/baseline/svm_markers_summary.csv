@@ -1,0 +1,7 @@
+Model Type,Data Type,Dataset,hyperparams,AUC
+SVM,Marker,Zeller_fecal_colorectal_cancer,"[5, -9]",0.6592592592592592
+SVM,Marker,Quin_gut_liver_cirrhosis,"[-5, -15]",0.05615942028985507
+SVM,Marker,metahit,"[-1, -3]",0.8823529411764706
+SVM,Marker,t2dmeta_long,"[-3, -11]",0.2848739495798319
+SVM,Marker,WT2D,"[5, -9]",0.9191919191919192
+SVM,Marker,Chatelier_gut_obesity,"[1, 2]",0.6262975778546712
