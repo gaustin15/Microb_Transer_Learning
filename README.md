@@ -39,4 +39,4 @@ Outline of the Reposity
 | `Notebooks` | These are the notebooks which run all the training, store all the results, and create all the figures. They should be run in their numbered order|
 | `results` | This is the folder where the numerical results from each experiment is stored, in csv format. The notebooks are designed to avoid overwriting the files wtihin this folder, so the contents of results will need to be cleared if a user wants to run the notebooks|
 | `figures` | This is where all the plots and visualizations of the data and results are stored. These are the figures used to create the reports|
-| `Reports` | These are the written up summaries of the project, which are the proposal, the midpoint update, and the final report, summarizing the project and its findings.|
+| `Reports` | These are the written up summaries of the project, which are the proposal, the midpoint update, and the final report.|
