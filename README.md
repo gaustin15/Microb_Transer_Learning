@@ -22,7 +22,6 @@ mkdir Microb_Transer_Learning/data/abundance
 mkdir Microb_Transer_Learning/data/marker
 unzip DeepMicro/data/abundance.zip -d Microb_Transer_Learning/data/abundance
 unzip DeepMicro/data/marker.zip -d Microb_Transer_Learning/data/marker/
-rm -rf DeepMicro
 cd Microb_Transfer_Learning
 git submodule update --init --recursive
 ```
